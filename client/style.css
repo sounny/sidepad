@@ -246,6 +246,25 @@ html, body {
   pointer-events: none;
 }
 
+/* Credits */
+.credits {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  animation: fadeInUp 0.8s ease 0.5s both;
+  margin-top: 4px;
+}
+
+.credits a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.credits a:hover {
+  color: var(--accent-light);
+}
+
 /* Secondary connect button */
 .btn-connect-alt {
   width: 100%;

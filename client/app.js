@@ -410,36 +410,47 @@ function sendConfigUpdate(updates) {
 // ---- Settings Panel Gesture ----
 function setupSettingsPanelGesture() {
   let startY = 0;
+  let tracking = false;
 
   document.addEventListener('touchstart', (e) => {
     if (!viewerScreen.classList.contains('active')) return;
-    if (e.touches[0].clientY < 30 && !settingsOpen) {
-      startY = e.touches[0].clientY;
-    }
+    startY = e.touches[0].clientY;
+    tracking = true;
+
+    // Three-finger tap to toggle
     if (e.touches.length === 3) {
       e.preventDefault();
       toggleSettings();
+      tracking = false;
     }
   }, { passive: false });
 
   document.addEventListener('touchmove', (e) => {
-    if (startY > 0 && startY < 30) {
-      if (e.touches[0].clientY - startY > 60 && !settingsOpen) {
-        toggleSettings();
-        startY = 0;
-      }
+    if (!tracking || !viewerScreen.classList.contains('active')) return;
+    const deltaY = e.touches[0].clientY - startY;
+
+    // Swipe DOWN from top edge to OPEN
+    if (!settingsOpen && startY < 40 && deltaY > 50) {
+      toggleSettings();
+      tracking = false;
+    }
+
+    // Swipe UP to CLOSE
+    if (settingsOpen && deltaY < -50) {
+      toggleSettings();
+      tracking = false;
     }
   });
 
-  document.addEventListener('touchend', () => { startY = 0; });
+  document.addEventListener('touchend', () => { tracking = false; startY = 0; });
 
+  // Click handle bar to close
   document.getElementById('settings-handle').addEventListener('click', () => {
     if (settingsOpen) toggleSettings();
   });
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && settingsOpen) toggleSettings();
-    // F key for fullscreen toggle
     if (e.key === 'f' || e.key === 'F') toggleFullscreen();
   });
 }
@@ -465,6 +476,9 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 
 // ---- Screen Wake Lock (prevent tablet from sleeping) ----
 async function acquireWakeLock() {
+  // Always start the NoSleep fallback (audio + timer) for maximum reliability
+  startNoSleepFallback();
+
   try {
     if ('wakeLock' in navigator) {
       wakeLock = await navigator.wakeLock.request('screen');
@@ -498,31 +512,51 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // NoSleep fallback for browsers without Wake Lock API
-let noSleepVideo = null;
+// Uses Web Audio API + periodic screen interaction to keep Silk/Fire tablet awake
+let noSleepInterval = null;
+let noSleepAudioCtx = null;
 
 function startNoSleepFallback() {
-  if (noSleepVideo) return;
-  noSleepVideo = document.createElement('video');
-  noSleepVideo.setAttribute('playsinline', '');
-  noSleepVideo.setAttribute('muted', '');
-  noSleepVideo.style.position = 'fixed';
-  noSleepVideo.style.opacity = '0';
-  noSleepVideo.style.width = '1px';
-  noSleepVideo.style.height = '1px';
-  noSleepVideo.style.pointerEvents = 'none';
-  // Use a tiny data URI video that loops
-  noSleepVideo.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAA0BtZGF0AAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE1NyByMjk2OSBkMThhYmYwIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxOSAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTEgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTEgc2NlbmVjdXQ9NDAgaW50cmFfcmVmcmVzaD0wIHJjX2xvb2thaGVhZD00MCByYz1jcmYgbWJ0cmVlPTEgY3JmPTIzLjAgcWNvbXA9MC42MCBxcG1pbj0wIHFwbWF4PTY5IHFwc3RlcD00IGlwX3JhdGlvPTEuNDAgYXE9MToxLjAwAIAAAAARZYiEAD//8m+P5GIAAAMASAAAL/IAAA';
-  noSleepVideo.loop = true;
-  noSleepVideo.muted = true;
-  document.body.appendChild(noSleepVideo);
-  noSleepVideo.play().catch(() => {});
-  console.log('[NoSleep] Fallback video started');
+  if (noSleepInterval) return;
+
+  // Create a silent audio context (keeps CPU active, prevents sleep on many mobile browsers)
+  try {
+    noSleepAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = noSleepAudioCtx.createOscillator();
+    const gain = noSleepAudioCtx.createGain();
+    gain.gain.value = 0.001; // Nearly silent
+    oscillator.connect(gain);
+    gain.connect(noSleepAudioCtx.destination);
+    oscillator.start();
+    console.log('[NoSleep] Audio context started');
+  } catch (e) {
+    console.log('[NoSleep] Audio fallback failed:', e.message);
+  }
+
+  // Periodically poke the screen to reset the sleep timer
+  noSleepInterval = setInterval(() => {
+    // Tiny title change forces browser activity
+    document.title = document.title.endsWith(' ') ? 'SidePad' : 'SidePad ';
+
+    // Re-request wake lock in case it was released
+    if ('wakeLock' in navigator && isConnected && !wakeLock) {
+      navigator.wakeLock.request('screen').then(wl => {
+        wakeLock = wl;
+      }).catch(() => {});
+    }
+  }, 15000); // Every 15 seconds
+
+  console.log('[NoSleep] Keep-awake timer started');
 }
 
 function stopNoSleepFallback() {
-  if (noSleepVideo) {
-    noSleepVideo.pause();
-    noSleepVideo.remove();
-    noSleepVideo = null;
+  if (noSleepInterval) {
+    clearInterval(noSleepInterval);
+    noSleepInterval = null;
   }
+  if (noSleepAudioCtx) {
+    noSleepAudioCtx.close().catch(() => {});
+    noSleepAudioCtx = null;
+  }
+  document.title = 'SidePad';
 }
