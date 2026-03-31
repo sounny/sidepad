@@ -1,0 +1,37 @@
+{
+  "name": "sidepad",
+  "version": "1.0.0",
+  "description": "Turn any tablet into a wireless second monitor. Open source alternative to Duet Display and Apple Sidecar.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "dual-monitor",
+    "second-screen",
+    "tablet",
+    "fire-tablet",
+    "sidecar",
+    "sidepad",
+    "screen-sharing",
+    "wireless-display",
+    "extended-desktop",
+    "duet-display"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "ws": "^8.18.0",
+    "screenshot-desktop": "^1.15.0",
+    "sharp": "^0.33.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

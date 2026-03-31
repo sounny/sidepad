@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0a0a0f">
+  <title>SidePad - Second Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Connection Screen -->
+  <div id="connect-screen" class="screen active">
+    <div class="connect-container">
+      <div class="logo-section">
+        <div class="logo-icon">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <rect x="4" y="8" width="56" height="40" rx="4" stroke="url(#grad1)" stroke-width="3" fill="none"/>
+            <rect x="14" y="52" width="36" height="4" rx="2" fill="url(#grad1)"/>
+            <rect x="8" y="12" width="22" height="32" rx="2" fill="url(#grad1)" opacity="0.15"/>
+            <rect x="34" y="12" width="22" height="32" rx="2" fill="url(#grad2)" opacity="0.3"/>
+            <line x1="32" y1="12" x2="32" y2="44" stroke="url(#grad2)" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <defs>
+              <linearGradient id="grad1" x1="0" y1="0" x2="64" y2="64">
+                <stop offset="0%" stop-color="#6366f1"/>
+                <stop offset="100%" stop-color="#8b5cf6"/>
+              </linearGradient>
+              <linearGradient id="grad2" x1="0" y1="0" x2="64" y2="64">
+                <stop offset="0%" stop-color="#8b5cf6"/>
+                <stop offset="100%" stop-color="#a78bfa"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <h1 class="logo-title">SidePad</h1>
+        <p class="logo-subtitle">Second Monitor for Tablets</p>
+      </div>
+
+      <div class="status-section">
+        <div class="status-indicator" id="status-indicator">
+          <div class="status-dot"></div>
+          <span id="status-text">Connecting...</span>
+        </div>
+        <p class="status-detail" id="status-detail">Establishing connection to your PC</p>
+      </div>
+
+      <div class="info-card">
+        <div class="info-row">
+          <span class="info-label">Server</span>
+          <span class="info-value" id="info-server">--</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Resolution</span>
+          <span class="info-value" id="info-resolution">--</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Latency</span>
+          <span class="info-value" id="info-latency">--</span>
+        </div>
+      </div>
+
+      <!-- Display selector (shown when multiple displays detected) -->
+      <div class="display-section" id="display-section" style="display:none">
+        <div class="info-card">
+          <div class="info-row">
+            <span class="info-label">Display to Stream</span>
+            <select class="display-select" id="display-selector">
+              <option value="0">Primary Display</option>
+            </select>
+          </div>
+          <div class="display-hint">
+            Select your extended/virtual display to use as a second monitor (not mirror)
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-connect" id="btn-connect" onclick="connectAndFullscreen()">
+        <span>Connect &amp; Go Fullscreen</span>
+      </button>
+      <button class="btn-connect-alt" id="btn-connect-only" onclick="connect()">
+        <span>Connect Without Fullscreen</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Viewer Screen (fullscreen canvas) -->
+  <div id="viewer-screen" class="screen">
+    <canvas id="display-canvas"></canvas>
+
+    <!-- Floating HUD -->
+    <div id="hud" class="hud">
+      <div class="hud-pill">
+        <span class="hud-fps" id="hud-fps">-- FPS</span>
+        <span class="hud-sep">·</span>
+        <span class="hud-latency" id="hud-latency">--ms</span>
+      </div>
+    </div>
+
+    <!-- Fullscreen toggle button -->
+    <button id="fullscreen-btn" class="fullscreen-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path id="fs-icon-expand" d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        <path id="fs-icon-shrink" d="M4 14h3a1 1 0 0 1 1 1v3m12-4h-3a1 1 0 0 0-1 1v3m0-14v-3a1 1 0 0 0-1-1h-3M4 10V7a1 1 0 0 1 1-1h3" style="display:none"/>
+      </svg>
+    </button>
+
+    <!-- Settings Panel (swipe down to reveal) -->
+    <div id="settings-panel" class="settings-panel">
+      <div class="settings-handle" id="settings-handle">
+        <div class="handle-bar"></div>
+      </div>
+      <div class="settings-content">
+        <h3 class="settings-title">Stream Settings</h3>
+
+        <div class="setting-group">
+          <label class="setting-label">
+            Quality
+            <span class="setting-value" id="quality-value">80%</span>
+          </label>
+          <input type="range" class="setting-slider" id="quality-slider" 
+                 min="10" max="100" step="5" value="80">
+          <div class="setting-hint">Lower = faster, Higher = sharper</div>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">
+            Frame Rate
+            <span class="setting-value" id="fps-value">15 FPS</span>
+          </label>
+          <input type="range" class="setting-slider" id="fps-slider" 
+                 min="5" max="60" step="5" value="15">
+          <div class="setting-hint">Lower = less bandwidth, Higher = smoother</div>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">Touch Input</label>
+          <div class="setting-toggle-row">
+            <span class="toggle-label">Forward touch to PC mouse</span>
+            <label class="toggle">
+              <input type="checkbox" id="touch-toggle" checked>
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+        </div>
+
+        <button class="btn-disconnect" onclick="disconnect()">Disconnect</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
