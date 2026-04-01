@@ -265,6 +265,24 @@ html, body {
   color: var(--accent-light);
 }
 
+.stay-awake-tip {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding: 12px 16px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  border-radius: var(--radius-sm);
+  animation: fadeInUp 0.8s ease 0.6s both;
+  margin-top: 4px;
+}
+
+.stay-awake-tip strong {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
 /* Secondary connect button */
 .btn-connect-alt {
   width: 100%;

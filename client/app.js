@@ -511,52 +511,77 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// NoSleep fallback for browsers without Wake Lock API
-// Uses Web Audio API + periodic screen interaction to keep Silk/Fire tablet awake
+// NoSleep: aggressive keep-awake for Fire tablet Silk browser
+// Uses 3 techniques simultaneously:
+// 1. Canvas MediaStream video (Android respects video playback)
+// 2. Web Audio API oscillator
+// 3. Synthetic pointer events to reset inactivity timer
 let noSleepInterval = null;
 let noSleepAudioCtx = null;
+let noSleepVideo = null;
 
 function startNoSleepFallback() {
   if (noSleepInterval) return;
 
-  // Create a silent audio context (keeps CPU active, prevents sleep on many mobile browsers)
+  // Technique 1: Create a real MediaStream video from a canvas
   try {
-    noSleepAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = noSleepAudioCtx.createOscillator();
-    const gain = noSleepAudioCtx.createGain();
-    gain.gain.value = 0.001; // Nearly silent
-    oscillator.connect(gain);
-    gain.connect(noSleepAudioCtx.destination);
-    oscillator.start();
-    console.log('[NoSleep] Audio context started');
+    const nsCanvas = document.createElement('canvas');
+    nsCanvas.width = 1; nsCanvas.height = 1;
+    const stream = nsCanvas.captureStream(1);
+    noSleepVideo = document.createElement('video');
+    noSleepVideo.srcObject = stream;
+    noSleepVideo.muted = true;
+    noSleepVideo.setAttribute('playsinline', '');
+    noSleepVideo.style.cssText = 'position:fixed;opacity:0;width:1px;height:1px;pointer-events:none;z-index:-1';
+    document.body.appendChild(noSleepVideo);
+    noSleepVideo.play().catch(() => {});
+    console.log('[NoSleep] MediaStream video started');
   } catch (e) {
-    console.log('[NoSleep] Audio fallback failed:', e.message);
+    console.log('[NoSleep] MediaStream failed:', e.message);
   }
 
-  // Periodically poke the screen to reset the sleep timer
+  // Technique 2: Silent audio oscillator
+  try {
+    noSleepAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = noSleepAudioCtx.createOscillator();
+    const gain = noSleepAudioCtx.createGain();
+    gain.gain.value = 0.001;
+    osc.connect(gain);
+    gain.connect(noSleepAudioCtx.destination);
+    osc.start();
+    console.log('[NoSleep] Audio oscillator started');
+  } catch (e) {
+    console.log('[NoSleep] Audio failed:', e.message);
+  }
+
+  // Technique 3: Periodic synthetic activity
   noSleepInterval = setInterval(() => {
-    // Tiny title change forces browser activity
+    // Dispatch synthetic pointer event (resets Android sleep timer)
+    try {
+      document.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: true, clientX: 0, clientY: 0, pointerType: 'touch'
+      }));
+    } catch {}
+
     document.title = document.title.endsWith(' ') ? 'SidePad' : 'SidePad ';
 
-    // Re-request wake lock in case it was released
-    if ('wakeLock' in navigator && isConnected && !wakeLock) {
-      navigator.wakeLock.request('screen').then(wl => {
-        wakeLock = wl;
-      }).catch(() => {});
+    if (noSleepAudioCtx && noSleepAudioCtx.state === 'suspended') {
+      noSleepAudioCtx.resume().catch(() => {});
     }
-  }, 15000); // Every 15 seconds
+    if ('wakeLock' in navigator && isConnected && !wakeLock) {
+      navigator.wakeLock.request('screen').then(wl => { wakeLock = wl; }).catch(() => {});
+    }
+    if (noSleepVideo && noSleepVideo.paused) {
+      noSleepVideo.play().catch(() => {});
+    }
+  }, 20000);
 
-  console.log('[NoSleep] Keep-awake timer started');
+  console.log('[NoSleep] All keep-awake techniques active');
 }
 
 function stopNoSleepFallback() {
-  if (noSleepInterval) {
-    clearInterval(noSleepInterval);
-    noSleepInterval = null;
-  }
-  if (noSleepAudioCtx) {
-    noSleepAudioCtx.close().catch(() => {});
-    noSleepAudioCtx = null;
-  }
+  if (noSleepInterval) { clearInterval(noSleepInterval); noSleepInterval = null; }
+  if (noSleepAudioCtx) { noSleepAudioCtx.close().catch(() => {}); noSleepAudioCtx = null; }
+  if (noSleepVideo) { noSleepVideo.pause(); noSleepVideo.srcObject = null; noSleepVideo.remove(); noSleepVideo = null; }
   document.title = 'SidePad';
 }

@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "setup-display": "node scripts/setup-display.js"
   },
   "keywords": [
     "dual-monitor",
@@ -19,11 +20,11 @@
     "extended-desktop",
     "duet-display"
   ],
-  "author": "",
+  "author": "Sounny",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/sounny/sidepad.git"
   },
   "dependencies": {
     "express": "^4.21.0",
